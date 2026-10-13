@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>취업알림</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mu:#666;--bd:#e3e3e3;--ac:#2563eb;--cd:#f7f7f8}
+@media(prefers-color-scheme:dark){:root{--bg:#121212;--fg:#eee;--mu:#9a9a9a;--bd:#333;--ac:#7aa7ff;--cd:#1c1c1e}}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,"Noto Sans KR",sans-serif}
+.w{max-width:760px;margin:0 auto;padding:12px}
+h1{font-size:18px;margin:4px 0}
+.mu{color:var(--mu);font-size:13px}
+.bar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+button,input{font:inherit;border:1px solid var(--bd);background:var(--cd);color:var(--fg);border-radius:8px;padding:6px 10px}
+button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+input{flex:1;min-width:140px}
+.it{border:1px solid var(--bd);background:var(--cd);border-radius:10px;padding:10px;margin:8px 0}
+.it a{color:var(--ac);text-decoration:none;font-weight:600}
+.pg{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin:12px 0}
+</style></head><body><div class="w">
+<h1>📋 취업알림</h1><div id="meta" class="mu"></div>
+<div class="bar" id="modes"></div><div class="bar" id="tabs"></div>
+<div class="bar"><input id="q" placeholder="제목/회사 검색"></div>
+<div id="list"></div><div class="pg" id="pg"></div></div>
+<script>
+(function(){
+var PER=50;
+var P=new URLSearchParams(location.search);
+var st={m:P.get("m")==="t"?"t":"y",s:0,p:1,q:""};
+var D=null;
+function $(i){return document.getElementById(i)}
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
+function btn(txt,on,fn){var b=el("button",on?"on":"",txt);b.onclick=fn;return b}
+function load(){
+ $("list").textContent="불러오는 중...";
+ fetch((st.m==="t"?"d_today.json":"d_yesterday.json")+"?t="+Date.now())
+ .then(function(r){if(!r.ok)throw 0;return r.json()})
+ .then(function(d){D=d;st.s=0;st.p=1;render()})
+ .catch(function(){D=null;$("meta").textContent="";$("tabs").textContent="";$("pg").textContent="";$("list").textContent="데이터가 아직 없습니다.";modes()});
+}
+function modes(){
+ var md=$("modes");md.textContent="";
+ md.appendChild(btn("어제 등록",st.m==="y",function(){st.m="y";load()}));
+ md.appendChild(btn("오늘 등록(수동)",st.m==="t",function(){st.m="t";load()}));
+}
+function render(){
+ modes();
+ $("meta").textContent=D.label+" · 갱신 "+D.upd;
+ var tb=$("tabs");tb.textContent="";
+ D.sites.forEach(function(s,i){tb.appendChild(btn(s.n+" ("+s.i.length+")",i===st.s,function(){st.s=i;st.p=1;render()}))});
+ var s=D.sites[st.s];
+ var q=st.q.toLowerCase();
+ var L=s.i.filter(function(r){return !q||(r[1]+" "+r[2]).toLowerCase().indexOf(q)>-1});
+ var tot=Math.max(1,Math.ceil(L.length/PER));
+ if(st.p>tot)st.p=tot;
+ var ls=$("list");ls.textContent="";
+ if(s.x)ls.appendChild(el("div","mu","제외검색어로 "+s.x+"건 제외됨"));
+ if(!L.length){ls.appendChild(el("div","",s.i.length?"검색 결과 없음":"신규 공고없음"))}
+ L.slice((st.p-1)*PER,st.p*PER).forEach(function(r){
+  var d=el("div","it");
+  var a=el("a","",(r[6]?"[수정] ":"")+r[1]);a.href=s.b+r[0];a.target="_blank";a.rel="noopener";
+  d.appendChild(a);
+  d.appendChild(el("div","mu",r[2]));
+  var x=[r[3],r[4],r[5]].filter(Boolean).join(" | ");
+  if(x)d.appendChild(el("div","mu",x));
+  ls.appendChild(d);
+ });
+ var pg=$("pg");pg.textContent="";
+ if(tot>1){for(var i=1;i<=tot;i++){(function(n){pg.appendChild(btn(String(n),n===st.p,function(){st.p=n;render();window.scrollTo(0,0)}))})(i)}}
+}
+$("q").oninput=function(){st.q=this.value;st.p=1;if(D)render()};
+load();
+})();
+</script></body></html>
