@@ -30,6 +30,7 @@ var D=null;
 function $(i){return document.getElementById(i)}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
 function btn(txt,on,fn){var b=el("button",on?"on":"",txt);b.onclick=fn;return b}
+function fd(s){if(!s)return s;var m=String(s).match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})/);return m?m[1].slice(2)+"/"+m[2]+"/"+m[3]:s}
 function load(){
  $("list").textContent="불러오는 중...";
  fetch((st.m==="t"?"d_today.json":"d_yesterday.json")+"?t="+Date.now())
@@ -39,8 +40,8 @@ function load(){
 }
 function modes(){
  var md=$("modes");md.textContent="";
- md.appendChild(btn("어제 등록",st.m==="y",function(){st.m="y";load()}));
- md.appendChild(btn("오늘 등록(수동)",st.m==="t",function(){st.m="t";load()}));
+ md.appendChild(btn("어제 등록/수정",st.m==="y",function(){st.m="y";load()}));
+ md.appendChild(btn("오늘 등록/수정(수동)",st.m==="t",function(){st.m="t";load()}));
 }
 function render(){
  modes();
@@ -54,14 +55,23 @@ function render(){
  if(st.p>tot)st.p=tot;
  var ls=$("list");ls.textContent="";
  if(s.x)ls.appendChild(el("div","mu","제외검색어로 "+s.x+"건 제외됨"));
- if(!L.length){ls.appendChild(el("div","",s.i.length?"검색 결과 없음":"신규 공고없음"))}
+ if(!L.length){ls.appendChild(el("div","",s.i.length?"검색 결과 없음":"해당 일자 공고 없음"))}
+ var isNamgu=(s.n==="부산 남구청");
  L.slice((st.p-1)*PER,st.p*PER).forEach(function(r){
   var d=el("div","it");
-  var a=el("a","",(r[6]?"[수정] ":"")+r[1]);a.href=s.b+r[0];a.target="_blank";a.rel="noopener";
+  var link = (s.b.slice(-1)==="=" || s.b.slice(-1)==="/") ? (s.b + r[0]) : s.b;
+  var a=el("a","",(r[6]?"[수정] ":"")+r[1]);a.href=link;a.target="_blank";a.rel="noopener";
   d.appendChild(a);
-  d.appendChild(el("div","mu",r[2]));
-  var x=[r[3],r[4],r[5]].filter(Boolean).join(" | ");
-  if(x)d.appendChild(el("div","mu",x));
+  if(isNamgu){
+   var meta=[];
+   if(r[5])meta.push(r[5]);
+   if(r[4])meta.push("등록: "+fd(r[4]));
+   if(meta.length)d.appendChild(el("div","mu",meta.join(" | ")));
+  }else{
+   d.appendChild(el("div","mu",r[2]));
+   var x=[r[3],r[4],r[5]].filter(Boolean).join(" | ");
+   if(x)d.appendChild(el("div","mu",x));
+  }
   ls.appendChild(d);
  });
  var pg=$("pg");pg.textContent="";
