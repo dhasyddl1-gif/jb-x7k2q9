@@ -25,7 +25,8 @@ input{flex:1;min-width:140px}
 (function(){
 var PER=50;
 var P=new URLSearchParams(location.search);
-var st={m:P.get("m")==="t"?"t":"y",s:0,p:1,q:""};
+var fileParam = P.get("f");
+var st={m:fileParam ? "snapshot" : (P.get("m")==="t"?"t":"y"),s:0,p:1,q:""};
 var D=null;
 function $(i){return document.getElementById(i)}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
@@ -33,17 +34,25 @@ function btn(txt,on,fn){var b=el("button",on?"on":"",txt);b.onclick=fn;return b}
 function fd(s){if(!s)return s;var m=String(s).match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})/);return m?m[1].slice(2)+"/"+m[2]+"/"+m[3]:s}
 function load(){
  $("list").textContent="불러오는 중...";
- var fileParam = P.get("f");
  var targetJson = fileParam ? (fileParam + ".json") : (st.m==="t"?"d_today.json":"d_yesterday.json");
  fetch(targetJson + "?t=" + Date.now())
  .then(function(r){if(!r.ok)throw 0;return r.json()})
  .then(function(d){D=d;st.s=0;st.p=1;render()})
- .catch(function(){D=null;$("meta").textContent="";$("tabs").textContent="";$("pg").textContent="";$("list").textContent="데이터가 아직 없습니다.";modes()});
+ .catch(function(){
+  D=null;$("meta").textContent="";$("tabs").textContent="";$("pg").textContent="";
+  $("list").textContent="데이터가 아직 없거나 배포 중입니다. 잠시 후 새로고침 해주세요.";
+  modes();
+ });
 }
 function modes(){
  var md=$("modes");md.textContent="";
- md.appendChild(btn("어제 등록/수정",st.m==="y",function(){st.m="y";load()}));
- md.appendChild(btn("오늘 등록/수정(수동)",st.m==="t",function(){st.m="t";load()}));
+ if(fileParam){
+  md.appendChild(btn("📌 발송 시점 보존 기록",true,function(){}));
+  md.appendChild(btn("최신 오늘 공고 보기",false,function(){location.href=location.pathname+"?m=t"}));
+ }else{
+  md.appendChild(btn("어제 등록/수정",st.m==="y",function(){st.m="y";load()}));
+  md.appendChild(btn("오늘 등록/수정(수동)",st.m==="t",function(){st.m="t";load()}));
+ }
 }
 function render(){
  modes();
