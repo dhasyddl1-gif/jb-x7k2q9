@@ -33,7 +33,9 @@ function btn(txt,on,fn){var b=el("button",on?"on":"",txt);b.onclick=fn;return b}
 function fd(s){if(!s)return s;var m=String(s).match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})/);return m?m[1].slice(2)+"/"+m[2]+"/"+m[3]:s}
 function load(){
  $("list").textContent="불러오는 중...";
- fetch((st.m==="t"?"d_today.json":"d_yesterday.json")+"?t="+Date.now())
+ var fileParam = P.get("f");
+ var targetJson = fileParam ? (fileParam + ".json") : (st.m==="t"?"d_today.json":"d_yesterday.json");
+ fetch(targetJson + "?t=" + Date.now())
  .then(function(r){if(!r.ok)throw 0;return r.json()})
  .then(function(d){D=d;st.s=0;st.p=1;render()})
  .catch(function(){D=null;$("meta").textContent="";$("tabs").textContent="";$("pg").textContent="";$("list").textContent="데이터가 아직 없습니다.";modes()});
@@ -56,15 +58,16 @@ function render(){
  var ls=$("list");ls.textContent="";
  if(s.x)ls.appendChild(el("div","mu","제외검색어로 "+s.x+"건 제외됨"));
  if(!L.length){ls.appendChild(el("div","",s.i.length?"검색 결과 없음":"해당 일자 공고 없음"))}
- var isNamgu=(s.n==="부산 남구청");
+ var isGov=(s.n.indexOf("남구청")>-1||s.n.indexOf("시청")>-1||s.n.indexOf("부산일자리")>-1||s.n.indexOf("사회서비스원")>-1||s.n.indexOf("경제진흥원")>-1);
  L.slice((st.p-1)*PER,st.p*PER).forEach(function(r){
   var d=el("div","it");
-  var link = (s.b.slice(-1)==="=" || s.b.slice(-1)==="/") ? (s.b + r[0]) : s.b;
+  var link = (r[0] && r[0].indexOf("http") === 0) ? r[0] : ((s.b.slice(-1)==="=" || s.b.slice(-1)==="/") ? (s.b + r[0]) : (s.b + (r[0].indexOf("/")===0 ? r[0] : "/" + r[0])));
   var a=el("a","",(r[6]?"[수정] ":"")+r[1]);a.href=link;a.target="_blank";a.rel="noopener";
   d.appendChild(a);
-  if(isNamgu){
+  if(isGov){
    var meta=[];
-   if(r[5])meta.push(r[5]);
+   if(r[5] && s.n!=="부산사회서비스원")meta.push(r[5]);
+   if(r[3] && (s.n==="부산시청"||s.n.indexOf("취업정보")>-1||s.n.indexOf("공공채용")>-1||s.n.indexOf("경제진흥원")>-1))meta.push(r[3]);
    if(r[4])meta.push("등록: "+fd(r[4]));
    if(meta.length)d.appendChild(el("div","mu",meta.join(" | ")));
   }else{
