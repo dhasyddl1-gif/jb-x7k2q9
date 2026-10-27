@@ -58,7 +58,7 @@ function render(){
  var ls=$("list");ls.textContent="";
  if(s.x)ls.appendChild(el("div","mu","제외검색어로 "+s.x+"건 제외됨"));
  if(!L.length){ls.appendChild(el("div","",s.i.length?"검색 결과 없음":"해당 일자 공고 없음"))}
- var isGov=(s.n.indexOf("남구청")>-1||s.n.indexOf("시청")>-1||s.n.indexOf("부산일자리")>-1||s.n.indexOf("사회서비스원")>-1||s.n.indexOf("경제진흥원")>-1);
+ var isGov=(s.n.indexOf("남구청")>-1||s.n.indexOf("타 구청")>-1||s.n.indexOf("시청")>-1||s.n.indexOf("부산일자리")>-1||s.n.indexOf("사회서비스원")>-1||s.n.indexOf("경제진흥원")>-1);
  L.slice((st.p-1)*PER,st.p*PER).forEach(function(r){
   var d=el("div","it");
   var link = (r[0] && r[0].indexOf("http") === 0) ? r[0] : ((s.b.slice(-1)==="=" || s.b.slice(-1)==="/") ? (s.b + r[0]) : (s.b + (r[0].indexOf("/")===0 ? r[0] : "/" + r[0])));
@@ -67,7 +67,7 @@ function render(){
   if(isGov){
    var meta=[];
    if(r[5] && s.n!=="부산사회서비스원")meta.push(r[5]);
-   if(r[3] && (s.n==="부산시청"||s.n.indexOf("취업정보")>-1||s.n.indexOf("공공채용")>-1||s.n.indexOf("경제진흥원")>-1))meta.push(r[3]);
+   if(r[3] && (s.n==="부산시청"||s.n.indexOf("취업정보")>-1||s.n.indexOf("공공채용")>-1||s.n.indexOf("경제진흥원")>-1||s.n.indexOf("타 구청")>-1))meta.push(r[3]);
    if(r[4])meta.push("등록: "+fd(r[4]));
    if(meta.length)d.appendChild(el("div","mu",meta.join(" | ")));
   }else{
