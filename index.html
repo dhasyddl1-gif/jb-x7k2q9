@@ -26,7 +26,7 @@ input{flex:1;min-width:140px}
 var PER=50;
 var P=new URLSearchParams(location.search);
 var fileParam = P.get("f");
-var st={m:fileParam ? "snapshot" : (P.get("m")==="t"?"t":"y"),s:0,p:1,q:"",ex:false}; // 👈 ex: false 추가
+var st={m:fileParam ? "snapshot" : (P.get("m")==="t"?"t":"y"),s:0,p:1,q:"",ex:false,dist:true};
 var D=null;
 function $(i){return document.getElementById(i)}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
@@ -53,29 +53,47 @@ function modes(){
   md.appendChild(btn("어제 등록/수정",st.m==="y",function(){st.m="y";load()}));
   md.appendChild(btn("오늘 등록/수정(수동)",st.m==="t",function(){st.m="t";load()}));
  }
- // 👈 상단에 토글 스위치 버튼 추가
  md.appendChild(btn(st.ex ? "🚫 제외공고 보는 중 (클릭 시 복귀)" : "🚫 제외공고 보기", st.ex, function(){
   st.ex = !st.ex;
   st.p = 1;
   render();
  }));
+ if(D && D.sites && D.sites[st.s] && D.sites[st.s].n.indexOf("사람인") > -1){
+  md.appendChild(btn(st.dist ? "📍 사람인: 지정구역(10개구) 보는 중" : "📍 사람인: 부산 전체 보는 중", st.dist, function(){
+   st.dist = !st.dist;
+   st.p = 1;
+   render();
+  }));
+ }
 }
 function render(){
  modes();
  $("meta").textContent=D.label+" · 갱신 "+D.upd;
+ var D10 = ["동구", "서구", "동래구", "사상구", "수영구", "중구", "남구", "진구", "연제구", "해운대구"];
+ function isD10(row){
+  var condStr = String(row[3] || "");
+  for(var k=0; k<D10.length; k++){
+   if(condStr.indexOf(D10[k]) > -1) return true;
+  }
+  return false;
+ }
  var tb=$("tabs");tb.textContent="";
  D.sites.forEach(function(s,i){
-  var cnt = st.ex ? ((s.ex && s.ex.length) || 0) : s.i.length;
+  var rawArr = st.ex ? (s.ex || []) : s.i;
+  var cnt = (s.n.indexOf("사람인") > -1 && st.dist) ? rawArr.filter(isD10).length : rawArr.length;
   tb.appendChild(btn(s.n+" ("+cnt+")",i===st.s,function(){st.s=i;st.p=1;render()}))
  });
  var s=D.sites[st.s];
  var q=st.q.toLowerCase();
- // 👈 토글 ON이면 제외공고(s.ex), OFF면 정상공고(s.i) 출력
  var targetList = st.ex ? (s.ex || []) : s.i;
+ if(s.n.indexOf("사람인") > -1 && st.dist){
+  targetList = targetList.filter(isD10);
+ }
  var L=targetList.filter(function(r){return !q||(r[1]+" "+r[2]).toLowerCase().indexOf(q)>-1});
  var tot=Math.max(1,Math.ceil(L.length/PER));
  if(st.p>tot)st.p=tot;
  var ls=$("list");ls.textContent="";
+ if(s.n.indexOf("사람인") > -1 && st.dist) ls.appendChild(el("div","mu","📍 지정 구역(동·서·동래·사상·수영·중·남·진·연제·해운대구) 공고만 표시 중 (상단 버튼으로 전체 전환 가능)"));
  if(s.x)ls.appendChild(el("div","mu","제외검색어로 "+s.x+"건 제외됨"));
  if(!L.length){ls.appendChild(el("div","",s.i.length?"검색 결과 없음":"해당 일자 공고 없음"))}
  var isGov=(s.n.indexOf("남구청")>-1||s.n.indexOf("타 구청")>-1||s.n.indexOf("시청")>-1||s.n.indexOf("부산일자리")>-1||s.n.indexOf("사회서비스원")>-1||s.n.indexOf("경제진흥원")>-1||s.n.indexOf("원티드")>-1||s.n.indexOf("국가유산청")>-1);
