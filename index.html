@@ -59,7 +59,7 @@ function modes(){
   render();
  }));
  if(D && D.sites && D.sites[st.s] && D.sites[st.s].n.indexOf("사람인") > -1){
-  md.appendChild(btn(st.dist ? "📍 사람인: 지정구역(10개구) 보는 중" : "📍 사람인: 부산 전체 보는 중", st.dist, function(){
+  md.appendChild(btn(st.dist ? "📍 사람인: 지정구역(11개구) 보는 중" : "📍 사람인: 부산 전체 보는 중", st.dist, function(){
    st.dist = !st.dist;
    st.p = 1;
    render();
@@ -69,31 +69,32 @@ function modes(){
 function render(){
  modes();
  $("meta").textContent=D.label+" · 갱신 "+D.upd;
- var D10 = ["동구", "서구", "동래구", "사상구", "수영구", "중구", "남구", "진구", "연제구", "해운대구"];
- function isD10(row){
+ var D11 = ["동구", "서구", "동래구", "사상구", "사하구", "수영구", "중구", "남구", "진구", "연제구", "해운대구"];
+ function isD11(row){
   var condStr = String(row[3] || "");
-  for(var k=0; k<D10.length; k++){
-   if(condStr.indexOf(D10[k]) > -1) return true;
+  var sanitized = condStr.replace(/강서구/g, "");
+  for(var k=0; k<D11.length; k++){
+   if(sanitized.indexOf(D11[k]) > -1) return true;
   }
   return false;
  }
  var tb=$("tabs");tb.textContent="";
  D.sites.forEach(function(s,i){
   var rawArr = st.ex ? (s.ex || []) : s.i;
-  var cnt = (s.n.indexOf("사람인") > -1 && st.dist) ? rawArr.filter(isD10).length : rawArr.length;
+  var cnt = (s.n.indexOf("사람인") > -1 && st.dist) ? rawArr.filter(isD11).length : rawArr.length;
   tb.appendChild(btn(s.n+" ("+cnt+")",i===st.s,function(){st.s=i;st.p=1;render()}))
  });
  var s=D.sites[st.s];
  var q=st.q.toLowerCase();
  var targetList = st.ex ? (s.ex || []) : s.i;
  if(s.n.indexOf("사람인") > -1 && st.dist){
-  targetList = targetList.filter(isD10);
+  targetList = targetList.filter(isD11);
  }
  var L=targetList.filter(function(r){return !q||(r[1]+" "+r[2]).toLowerCase().indexOf(q)>-1});
  var tot=Math.max(1,Math.ceil(L.length/PER));
  if(st.p>tot)st.p=tot;
  var ls=$("list");ls.textContent="";
- if(s.n.indexOf("사람인") > -1 && st.dist) ls.appendChild(el("div","mu","📍 지정 구역(동·서·동래·사상·수영·중·남·진·연제·해운대구) 공고만 표시 중 (상단 버튼으로 전체 전환 가능)"));
+ if(s.n.indexOf("사람인") > -1 && st.dist) ls.appendChild(el("div","mu","📍 지정 구역(동·서·동래·사상·사하·수영·중·남·진·연제·해운대구) 공고만 표시 중 (상단 버튼으로 전체 전환 가능)"));
  if(s.x)ls.appendChild(el("div","mu","제외검색어로 "+s.x+"건 제외됨"));
  if(!L.length){ls.appendChild(el("div","",s.i.length?"검색 결과 없음":"해당 일자 공고 없음"))}
  var isGov=(s.n.indexOf("남구청")>-1||s.n.indexOf("타 구청")>-1||s.n.indexOf("시청")>-1||s.n.indexOf("부산일자리")>-1||s.n.indexOf("사회서비스원")>-1||s.n.indexOf("경제진흥원")>-1||s.n.indexOf("원티드")>-1||s.n.indexOf("국가유산청")>-1);
