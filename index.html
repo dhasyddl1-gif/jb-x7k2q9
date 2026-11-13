@@ -16,17 +16,19 @@ input{flex:1;min-width:140px}
 .it{border:1px solid var(--bd);background:var(--cd);border-radius:10px;padding:10px;margin:8px 0}
 .it a{color:var(--ac);text-decoration:none;font-weight:600}
 .pg{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin:12px 0}
+.tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.tag-item{background:var(--cd);border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font-size:13px}
 </style></head><body><div class="w">
 <h1>📋 취업알림</h1><div id="meta" class="mu"></div>
 <div class="bar" id="modes"></div><div class="bar" id="tabs"></div>
-<div class="bar"><input id="q" placeholder="제목/회사 검색"></div>
+<div class="bar"><input id="q" placeholder="제목/회사/단어 검색"></div>
 <div id="list"></div><div class="pg" id="pg"></div></div>
 <script>
 (function(){
 var PER=50;
 var P=new URLSearchParams(location.search);
 var fileParam = P.get("f");
-var st={m:fileParam ? "snapshot" : (P.get("m")==="t"?"t":"y"),s:0,p:1,q:"",ex:false,dist:true};
+var st={m:fileParam ? "snapshot" : (P.get("m")==="t"?"t":"y"),s:0,p:1,q:"",ex:false,dist:true,viewWords:false};
 var D=null;
 function $(i){return document.getElementById(i)}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
@@ -47,28 +49,67 @@ function load(){
 function modes(){
  var md=$("modes");md.textContent="";
  if(fileParam){
-  md.appendChild(btn("📌 발송 시점 보존 기록",true,function(){}));
+  md.appendChild(btn("📌 발송 시점 보존 기록",!st.viewWords,function(){st.viewWords=false;st.p=1;render()}));
   md.appendChild(btn("최신 오늘 공고 보기",false,function(){location.href=location.pathname+"?m=t"}));
  }else{
-  md.appendChild(btn("어제 등록/수정",st.m==="y",function(){st.m="y";load()}));
-  md.appendChild(btn("오늘 등록/수정(수동)",st.m==="t",function(){st.m="t";load()}));
+  md.appendChild(btn("어제 등록/수정",!st.viewWords&&st.m==="y",function(){st.viewWords=false;st.m="y";load()}));
+  md.appendChild(btn("오늘 등록/수정(수동)",!st.viewWords&&st.m==="t",function(){st.viewWords=false;st.m="t";load()}));
  }
- md.appendChild(btn(st.ex ? "🚫 제외공고 보는 중 (클릭 시 복귀)" : "🚫 제외공고 보기", st.ex, function(){
-  st.ex = !st.ex;
+ var exclCount = (D && D.exclList) ? D.exclList.length : 0;
+ md.appendChild(btn("📑 제외단어 목록(" + exclCount + "개)", st.viewWords, function(){
+  st.viewWords = !st.viewWords;
   st.p = 1;
   render();
  }));
- if(D && D.sites && D.sites[st.s] && D.sites[st.s].n.indexOf("사람인") > -1){
-  md.appendChild(btn(st.dist ? "📍 사람인: 지정구역(11개구) 보는 중" : "📍 사람인: 부산 전체 보는 중", st.dist, function(){
-   st.dist = !st.dist;
+ if(!st.viewWords){
+  md.appendChild(btn(st.ex ? "🚫 제외공고 보는 중 (클릭 시 복귀)" : "🚫 제외공고 보기", st.ex, function(){
+   st.ex = !st.ex;
    st.p = 1;
    render();
   }));
+  if(D && D.sites && D.sites[st.s] && D.sites[st.s].n.indexOf("사람인") > -1){
+   md.appendChild(btn(st.dist ? "📍 사람인: 지정구역(11개구) 보는 중" : "📍 사람인: 부산 전체 보는 중", st.dist, function(){
+    st.dist = !st.dist;
+    st.p = 1;
+    render();
+   }));
+  }
  }
 }
 function render(){
  modes();
  $("meta").textContent=D.label+" · 갱신 "+D.upd;
+ var tb=$("tabs");tb.textContent="";
+ var ls=$("list");ls.textContent="";
+ var pg=$("pg");pg.textContent="";
+ var q=st.q.toLowerCase().trim();
+
+ // 💡 제외단어 목록 뷰 모드
+ if(st.viewWords){
+  var words = (D && D.exclList) ? D.exclList : [];
+  var filteredWords = words.filter(function(w){ return !q || w.toLowerCase().indexOf(q) > -1; });
+  var wordPer = 100;
+  var wTot = Math.max(1, Math.ceil(filteredWords.length / wordPer));
+  if(st.p > wTot) st.p = wTot;
+
+  ls.appendChild(el("div","mu","🚫 등록된 제외 검색어 총 " + words.length + "개 (검색 일치: " + filteredWords.length + "개)"));
+  var tagBox = el("div","tag-list");
+  filteredWords.slice((st.p - 1) * wordPer, st.p * wordPer).forEach(function(w, idx){
+   tagBox.appendChild(el("div","tag-item", ((st.p - 1) * wordPer + idx + 1) + ". " + w));
+  });
+  ls.appendChild(tagBox);
+
+  if(wTot > 1){
+   for(var i=1; i<=wTot; i++){
+    (function(n){
+     pg.appendChild(btn(String(n), n===st.p, function(){ st.p=n; render(); window.scrollTo(0,0); }));
+    })(i);
+   }
+  }
+  return;
+ }
+
+ // 공고 목록 뷰 모드
  var D11 = ["동구", "서구", "동래구", "사상구", "사하구", "수영구", "중구", "남구", "진구", "연제구", "해운대구"];
  function isD11(row){
   var condStr = String(row[3] || "");
@@ -78,14 +119,12 @@ function render(){
   }
   return false;
  }
- var tb=$("tabs");tb.textContent="";
  D.sites.forEach(function(s,i){
   var rawArr = st.ex ? (s.ex || []) : s.i;
   var cnt = (s.n.indexOf("사람인") > -1 && st.dist) ? rawArr.filter(isD11).length : rawArr.length;
   tb.appendChild(btn(s.n+" ("+cnt+")",i===st.s,function(){st.s=i;st.p=1;render()}))
  });
  var s=D.sites[st.s];
- var q=st.q.toLowerCase();
  var targetList = st.ex ? (s.ex || []) : s.i;
  if(s.n.indexOf("사람인") > -1 && st.dist){
   targetList = targetList.filter(isD11);
@@ -93,7 +132,6 @@ function render(){
  var L=targetList.filter(function(r){return !q||(r[1]+" "+r[2]).toLowerCase().indexOf(q)>-1});
  var tot=Math.max(1,Math.ceil(L.length/PER));
  if(st.p>tot)st.p=tot;
- var ls=$("list");ls.textContent="";
  if(s.n.indexOf("사람인") > -1 && st.dist) ls.appendChild(el("div","mu","📍 지정 구역(동·서·동래·사상·사하·수영·중·남·진·연제·해운대구) 공고만 표시 중 (상단 버튼으로 전체 전환 가능)"));
  if(s.x)ls.appendChild(el("div","mu","제외검색어로 "+s.x+"건 제외됨"));
  if(!L.length){ls.appendChild(el("div","",s.i.length?"검색 결과 없음":"해당 일자 공고 없음"))}
@@ -116,7 +154,6 @@ function render(){
   }
   ls.appendChild(d);
  });
- var pg=$("pg");pg.textContent="";
  if(tot>1){for(var i=1;i<=tot;i++){(function(n){pg.appendChild(btn(String(n),n===st.p,function(){st.p=n;render();window.scrollTo(0,0)}))})(i)}}
 }
 $("q").oninput=function(){st.q=this.value;st.p=1;if(D)render()};
