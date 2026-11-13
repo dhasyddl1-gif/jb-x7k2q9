@@ -39,7 +39,19 @@ function load(){
  var targetJson = fileParam ? (fileParam + ".json") : (st.m==="t"?"d_today.json":"d_yesterday.json");
  fetch(targetJson + "?t=" + Date.now())
  .then(function(r){if(!r.ok)throw 0;return r.json()})
- .then(function(d){D=d;st.s=0;st.p=1;render()})
+ .then(function(d){
+    D=d;
+    // 💡 공고 스냅샷은 그대로 두고, 제외단어만 실시간 전용 파일에서 독립 로드!
+    fetch("excl_list.json?t=" + Date.now())
+    .then(function(r){return r.ok ? r.json() : []})
+    .then(function(exList){
+      D.exclList = exList;
+      st.s=0;st.p=1;render();
+    })
+    .catch(function(){
+      st.s=0;st.p=1;render();
+    });
+ })
  .catch(function(){
   D=null;$("meta").textContent="";$("tabs").textContent="";$("pg").textContent="";
   $("list").textContent="데이터가 아직 없거나 배포 중입니다. 잠시 후 새로고침 해주세요.";
