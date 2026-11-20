@@ -28,12 +28,40 @@ input{flex:1;min-width:140px}
 var PER=50;
 var P=new URLSearchParams(location.search);
 var fileParam = P.get("f");
-var st={m:fileParam ? "snapshot" : (P.get("m")==="t"?"t":"y"),s:0,p:1,q:"",ex:false,dist:true,viewWords:false};
+var st={m:fileParam ? "snapshot" : (P.get("m")==="t"?"t":"y"),s:0,p:1,q:"",ex:false,dist:true,dedup:true,viewWords:false};
 var D=null;
+
+// 💡 중복 제거 적용 대상 및 우선순위 (딱 이 6개 사이트만 순서대로 적용)
+var DEDUP_ORDER = [
+ "사람인(부산)",
+ "잡코리아(부산)",
+ "고용24(부산)",
+ "인크루트(부산)",
+ "부산일자리(기업)",
+ "부산일자리(청년)"
+];
+
 function $(i){return document.getElementById(i)}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
 function btn(txt,on,fn){var b=el("button",on?"on":"",txt);b.onclick=fn;return b}
 function fd(s){if(!s)return s;var m=String(s).match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})/);return m?m[1].slice(2)+"/"+m[2]+"/"+m[3]:s}
+
+// 💡 6개 포털 회사명/제목 정규화 (법인 표기 및 띄어쓰기/특수문자 통일)
+function normComp(s){
+ return String(s||"")
+  .toLowerCase()
+  .replace(/(?:\(주\)|㈜|주식회사|\(유\)|유한회사|\(사\)|사단법인|\(재\)|재단법인|\(합\)|\(협\)|\(학\)|\(의\)|\(복\)|의료법인|사회복지법인|학교법인)/g,"")
+  .replace(/[^a-z0-9가-힣]/g,"");
+}
+function normTitle(s){
+ return String(s||"").toLowerCase().replace(/[^a-z0-9가-힣]/g,"");
+}
+function makeJobKey(row){
+ var nt=normTitle(row[1]);
+ if(!nt)return "";
+ return normComp(row[2])+"|"+nt;
+}
+
 function load(){
  $("list").textContent="불러오는 중...";
  var targetJson = fileParam ? (fileParam + ".json") : (st.m==="t"?"d_today.json":"d_yesterday.json");
@@ -41,7 +69,6 @@ function load(){
  .then(function(r){if(!r.ok)throw 0;return r.json()})
  .then(function(d){
     D=d;
-    // 💡 공고 스냅샷은 그대로 두고, 제외단어만 실시간 전용 파일에서 독립 로드!
     fetch("excl_list.json?t=" + Date.now())
     .then(function(r){return r.ok ? r.json() : []})
     .then(function(exList){
@@ -73,13 +100,22 @@ function modes(){
   st.p = 1;
   render();
  }));
+ var curSite = (D && D.sites && D.sites[st.s]) ? D.sites[st.s] : null;
  if(!st.viewWords){
   md.appendChild(btn(st.ex ? "🚫 제외공고 보는 중 (클릭 시 복귀)" : "🚫 제외공고 보기", st.ex, function(){
    st.ex = !st.ex;
    st.p = 1;
    render();
   }));
-  if(D && D.sites && D.sites[st.s] && D.sites[st.s].n.indexOf("사람인") > -1){
+  // 💡 지정한 6개 사이트 탭일 때만 중복공고 보기/안보기 버튼 표시
+  if(curSite && DEDUP_ORDER.indexOf(curSite.n) > -1){
+   md.appendChild(btn(st.dedup ? "🔁 중복공고 안보기 (클릭 시 보기)" : "🔁 중복공고 보기 (클릭 시 안보기)", st.dedup, function(){
+    st.dedup = !st.dedup;
+    st.p = 1;
+    render();
+   }));
+  }
+  if(curSite && curSite.n.indexOf("사람인") > -1){
    md.appendChild(btn(st.dist ? "📍 사람인: 지정구역(11개구) 보는 중" : "📍 사람인: 부산 전체 보는 중", st.dist, function(){
     st.dist = !st.dist;
     st.p = 1;
@@ -96,7 +132,6 @@ function render(){
  var pg=$("pg");pg.textContent="";
  var q=st.q.toLowerCase().trim();
 
- // 💡 제외단어 목록 뷰 모드
  if(st.viewWords){
   var words = (D && D.exclList) ? D.exclList : [];
   var filteredWords = words.filter(function(w){ return !q || w.toLowerCase().indexOf(q) > -1; });
@@ -121,7 +156,6 @@ function render(){
   return;
  }
 
- // 공고 목록 뷰 모드
  var D11 = ["동구", "서구", "동래구", "사상구", "사하구", "수영구", "중구", "남구", "진구", "연제구", "해운대구"];
  function isD11(row){
   var condStr = String(row[3] || "");
@@ -131,27 +165,91 @@ function render(){
   }
   return false;
  }
- D.sites.forEach(function(s,i){
-  var rawArr = st.ex ? (s.ex || []) : s.i;
-  var cnt = (s.n.indexOf("사람인") > -1 && st.dist) ? rawArr.filter(isD11).length : rawArr.length;
-  tb.appendChild(btn(s.n+" ("+cnt+")",i===st.s,function(){st.s=i;st.p=1;render()}))
+
+ // 💡 1단계: DEDUP_ORDER 6개 사이트만 지정 순서대로 중복 검사
+ var seenKeys = {};
+ var siteViewsByIndex = {};
+ var siteIndexByName = {};
+ D.sites.forEach(function(s, idx){
+  siteIndexByName[s.n] = idx;
  });
- var s=D.sites[st.s];
- var targetList = st.ex ? (s.ex || []) : s.i;
- if(s.n.indexOf("사람인") > -1 && st.dist){
-  targetList = targetList.filter(isD11);
+
+ for(var dIdx = 0; dIdx < DEDUP_ORDER.length; dIdx++){
+  var targetName = DEDUP_ORDER[dIdx];
+  var sIdx = siteIndexByName[targetName];
+  if(sIdx === undefined) continue;
+
+  var ts = D.sites[sIdx];
+  var rawArr = st.ex ? (ts.ex || []) : (ts.i || []);
+  var baseArr = (ts.n.indexOf("사람인") > -1 && st.dist) ? rawArr.filter(isD11) : rawArr;
+  var viewArr = [];
+  var dupCount = 0;
+  var siteKeys = [];
+
+  for(var k = 0; k < baseArr.length; k++){
+   var row = baseArr[k];
+   var key = makeJobKey(row);
+   var dupFrom = (key && seenKeys[key]) ? seenKeys[key] : "";
+   if(key) siteKeys.push(key);
+   if(dupFrom){
+    dupCount++;
+    if(!st.dedup) viewArr.push({r:row, dupFrom:dupFrom});
+   }else{
+    viewArr.push({r:row, dupFrom:""});
+   }
+  }
+  for(var m = 0; m < siteKeys.length; m++){
+   if(!seenKeys[siteKeys[m]]) seenKeys[siteKeys[m]] = ts.n;
+  }
+  siteViewsByIndex[sIdx] = {list:viewArr, dupCount:dupCount, rawCount:baseArr.length, isDedupTarget:true};
  }
- var L=targetList.filter(function(r){return !q||(r[1]+" "+r[2]).toLowerCase().indexOf(q)>-1});
+
+ // 💡 2단계: 나머지 14개 사이트는 중복 검사 없이 원본 그대로 유지
+ var siteViews = [];
+ D.sites.forEach(function(s, idx){
+  if(siteViewsByIndex[idx]){
+   siteViews.push(siteViewsByIndex[idx]);
+  }else{
+   var rawArr = st.ex ? (s.ex || []) : (s.i || []);
+   var viewArr = [];
+   for(var k = 0; k < rawArr.length; k++){
+    viewArr.push({r:rawArr[k], dupFrom:""});
+   }
+   siteViews.push({list:viewArr, dupCount:0, rawCount:rawArr.length, isDedupTarget:false});
+  }
+ });
+
+ D.sites.forEach(function(s,i){
+  var sv = siteViews[i];
+  tb.appendChild(btn(s.n+" ("+sv.list.length+")",i===st.s,function(){st.s=i;st.p=1;render()}));
+ });
+
+ var s=D.sites[st.s];
+ var sv=siteViews[st.s];
+ var L=sv.list.filter(function(it){
+  var r=it.r;
+  return !q||(r[1]+" "+r[2]).toLowerCase().indexOf(q)>-1;
+ });
  var tot=Math.max(1,Math.ceil(L.length/PER));
  if(st.p>tot)st.p=tot;
  if(s.n.indexOf("사람인") > -1 && st.dist) ls.appendChild(el("div","mu","📍 지정 구역(동·서·동래·사상·사하·수영·중·남·진·연제·해운대구) 공고만 표시 중 (상단 버튼으로 전체 전환 가능)"));
+ if(sv.isDedupTarget && st.dedup && sv.dupCount > 0) ls.appendChild(el("div","mu","🔁 앞선 사이트와 중복된 공고 " + sv.dupCount + "건 숨김 처리됨 (상단 버튼으로 보기 가능)"));
+ if(sv.isDedupTarget && !st.dedup && sv.dupCount > 0) ls.appendChild(el("div","mu","🔁 앞선 사이트와 중복된 공고 " + sv.dupCount + "건도 함께 표시 중"));
  if(s.x)ls.appendChild(el("div","mu","제외검색어로 "+s.x+"건 제외됨"));
- if(!L.length){ls.appendChild(el("div","",s.i.length?"검색 결과 없음":"해당 일자 공고 없음"))}
+ if(!L.length){
+  var emptyMsg="해당 일자 공고 없음";
+  if(q && sv.list.length) emptyMsg="검색 결과 없음";
+  else if(sv.isDedupTarget && st.dedup && sv.dupCount > 0 && sv.dupCount === sv.rawCount) emptyMsg="모든 공고가 앞선 사이트와 중복되어 숨겨졌습니다.";
+  else if(sv.rawCount > 0 && !sv.list.length) emptyMsg="필터 조건에 해당하는 공고가 없습니다.";
+  ls.appendChild(el("div","",emptyMsg));
+ }
  var isGov=(s.n.indexOf("남구청")>-1||s.n.indexOf("타 구청")>-1||s.n.indexOf("시청")>-1||s.n.indexOf("부산일자리")>-1||s.n.indexOf("사회서비스원")>-1||s.n.indexOf("경제진흥원")>-1||s.n.indexOf("원티드")>-1||s.n.indexOf("국가유산청")>-1);
- L.slice((st.p-1)*PER,st.p*PER).forEach(function(r){
+ L.slice((st.p-1)*PER,st.p*PER).forEach(function(it){
+  var r=it.r;
   var d=el("div","it");
   var link = (r[0] && r[0].indexOf("http") === 0) ? r[0] : ((s.b.slice(-1)==="=" || s.b.slice(-1)==="/") ? (s.b + r[0]) : (s.b + (r[0].indexOf("/")===0 ? r[0] : "/" + r[0])));
-  var a=el("a","",(r[6]?"[수정] ":"")+r[1]);a.href=link;a.target="_blank";a.rel="noopener";
+  var prefix = (it.dupFrom ? "[중복·" + it.dupFrom + "] " : "") + (r[6] ? "[수정] " : "");
+  var a=el("a","",prefix+r[1]);a.href=link;a.target="_blank";a.rel="noopener";
   d.appendChild(a);
   if(isGov){
    var meta=[];
